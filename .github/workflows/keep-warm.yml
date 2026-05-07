@@ -1,30 +1,64 @@
-name: Keep SpacePixel API Warm
+name: SpacePixel Monitor 5-Min
 
 on:
   schedule:
-    # Setiap 10 menit
-    - cron: '*/10 * * * *'
-  # Bisa juga manual trigger buat testing
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
-  ping:
+  monitor:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Ping API Health
+      - name: Test All Endpoints
+        id: test
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" https://YOUR-PROJECT.vercel.app/api/health)
-          echo "Status: $response"
+          BASE="https://sp-api-lime.vercel.app/api"
+          ENDPOINTS=(
+            "health"
+            "thrusters"
+            "shields"
+            "tanks"
+            "planets"
+          )
           
-          if [ $response -eq 200 ]; then
-            echo "✅ API is warm and responsive"
-          else
-            echo "⚠️ API returned status $response"
-            exit 1
-          fi
-      
-      - name: Ping Thrusters (testing real endpoint)
-        run: |
-          response=$(curl -s https://YOUR-PROJECT.vercel.app/api/thrusters)
-          echo "Thrusters: $response"
+          REPORT=""
+          ALL_OK=true
+          
+          for ep in "${ENDPOINTS[@]}"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" $BASE/$ep)
+            STATUS_ICON=$([ $STATUS -eq 200 ] && echo "🟢" || echo "🔴")
+            REPORT="${REPORT}${STATUS_ICON} \`/api/$ep\` → $STATUS\n"
+            
+            if [ $STATUS -ne 200 ]; then
+              ALL_OK=false
+            fi
+          done
+          
+          # Simpan ke output
+          echo "report<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$REPORT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "all_ok=$ALL_OK" >> $GITHUB_OUTPUT
+
+      - name: Send Report to Discord
+        uses: tsickert/discord-webhook@v6.0.0
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+          embed-title: "📊 SpacePixel API Report"
+          embed-description: |
+            **Interval:** Every 5 minutes
+            **Server:** $(date -u +"%H:%M UTC")
+            
+            ${{ steps.test.outputs.report }}
+          embed-color: ${{ steps.test.outputs.all_ok == 'true' && 65280 || 16711680 }}
+          embed-footer-text: "Vercel Cron: every 1min | GH Actions: every 5min"
+
+      - name: Alert if DOWN
+        if: steps.test.outputs.all_ok != 'true'
+        uses: tsickert/discord-webhook@v6.0.0
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_ALERT }}
+          embed-title: "🚨 CRITICAL: SpacePixel Endpoint DOWN"
+          embed-description: ${{ steps.test.outputs.report }}
+          embed-color: 16711680
