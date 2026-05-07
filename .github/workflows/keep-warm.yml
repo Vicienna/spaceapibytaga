@@ -1,45 +1,43 @@
-name: SpacePixel Monitor - Tiap 5 Menit dengan Loop 1-Min
+name: SpacePixel Monitor (5-Min Loop 1-Min)
 
 on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/keep-warm.yml'
 
 jobs:
-  monitor-loop:
+  monitor:
     runs-on: ubuntu-latest
     steps:
-      - name: Loop Ping Setiap 1 Menit Selama 5 Menit
+      - name: Loop & Report Every 1 Min (via curl)
         run: |
           BASE="https://sp-api-lime.vercel.app/api"
           ENDPOINTS="health thrusters shields tanks planets"
           
           for i in {1..5}; do
-            echo "========== Menit ke-$i =========="
             REPORT=""
             ALL_OK=true
             
             for ep in $ENDPOINTS; do
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" $BASE/$ep)
               ICON=$([ $STATUS -eq 200 ] && echo "🟢" || echo "🔴")
-              REPORT="${REPORT}${ICON} /api/$ep → $STATUS\n"
+              REPORT="${REPORT}${ICON} /api/$ep → $STATUS\\n"
               [ $STATUS -ne 200 ] && ALL_OK=false
             done
             
-            # Kirim ke Discord tiap iterasi
             curl -s -X POST ${{ secrets.DISCORD_WEBHOOK }} \
               -H "Content-Type: application/json" \
-              -d @- <<EOF
-            {
-              "embeds": [{
-                "title": "📊 SpacePixel Report (Menit $i/5)",
-                "description": "**Jam:** $(date -u +"%H:%M UTC")\n$REPORT",
-                "color": $([ "$ALL_OK" = true ] && echo "65280" || echo "16711680"),
-                "footer": {"text": "Loop: $i/5 - Next in 1 min"}
-              }]
-            }
-            EOF
+              -d "{
+                \"embeds\": [{
+                  \"title\": \"📊 SpacePixel Report [${i}/5]\",
+                  \"description\": \"**Jam:** $(date -u +'%H:%M UTC')\\n${REPORT}\",
+                  \"color\": $([ "$ALL_OK" = true ] && echo "65280" || echo "16711680"),
+                  \"footer\": {\"text\": \"Loop ${i}/5 | Vercel + GitHub Actions\"}
+                }]
+              }"
             
-            # Tunggu 60 detik kecuali iterasi terakhir
             [ $i -lt 5 ] && sleep 60
           done
