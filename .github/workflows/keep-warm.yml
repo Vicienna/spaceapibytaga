@@ -1,0 +1,30 @@
+name: Keep SpacePixel API Warm
+
+on:
+  schedule:
+    # Setiap 10 menit
+    - cron: '*/10 * * * *'
+  # Bisa juga manual trigger buat testing
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping API Health
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://YOUR-PROJECT.vercel.app/api/health)
+          echo "Status: $response"
+          
+          if [ $response -eq 200 ]; then
+            echo "✅ API is warm and responsive"
+          else
+            echo "⚠️ API returned status $response"
+            exit 1
+          fi
+      
+      - name: Ping Thrusters (testing real endpoint)
+        run: |
+          response=$(curl -s https://YOUR-PROJECT.vercel.app/api/thrusters)
+          echo "Thrusters: $response"
