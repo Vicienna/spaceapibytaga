@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: Loop & Report Every 1 Min (via curl)
         run: |
-          BASE="https://sp-api-lime.vercel.app/api"
+          BASE="https://spacebytaga.vercel.app/api"
           ENDPOINTS="health thrusters shields tanks planets"
           
           for i in {1..5}; do
