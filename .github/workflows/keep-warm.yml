@@ -1,4 +1,4 @@
-name: SpacePixel Monitor 5-Min
+name: SpacePixel Monitor - Tiap 5 Menit dengan Loop 1-Min
 
 on:
   schedule:
@@ -6,59 +6,40 @@ on:
   workflow_dispatch:
 
 jobs:
-  monitor:
+  monitor-loop:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Test All Endpoints
-        id: test
+      - name: Loop Ping Setiap 1 Menit Selama 5 Menit
         run: |
           BASE="https://sp-api-lime.vercel.app/api"
-          ENDPOINTS=(
-            "health"
-            "thrusters"
-            "shields"
-            "tanks"
-            "planets"
-          )
+          ENDPOINTS="health thrusters shields tanks planets"
           
-          REPORT=""
-          ALL_OK=true
-          
-          for ep in "${ENDPOINTS[@]}"; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" $BASE/$ep)
-            STATUS_ICON=$([ $STATUS -eq 200 ] && echo "🟢" || echo "🔴")
-            REPORT="${REPORT}${STATUS_ICON} \`/api/$ep\` → $STATUS\n"
+          for i in {1..5}; do
+            echo "========== Menit ke-$i =========="
+            REPORT=""
+            ALL_OK=true
             
-            if [ $STATUS -ne 200 ]; then
-              ALL_OK=false
-            fi
+            for ep in $ENDPOINTS; do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" $BASE/$ep)
+              ICON=$([ $STATUS -eq 200 ] && echo "🟢" || echo "🔴")
+              REPORT="${REPORT}${ICON} /api/$ep → $STATUS\n"
+              [ $STATUS -ne 200 ] && ALL_OK=false
+            done
+            
+            # Kirim ke Discord tiap iterasi
+            curl -s -X POST ${{ secrets.DISCORD_WEBHOOK }} \
+              -H "Content-Type: application/json" \
+              -d @- <<EOF
+            {
+              "embeds": [{
+                "title": "📊 SpacePixel Report (Menit $i/5)",
+                "description": "**Jam:** $(date -u +"%H:%M UTC")\n$REPORT",
+                "color": $([ "$ALL_OK" = true ] && echo "65280" || echo "16711680"),
+                "footer": {"text": "Loop: $i/5 - Next in 1 min"}
+              }]
+            }
+            EOF
+            
+            # Tunggu 60 detik kecuali iterasi terakhir
+            [ $i -lt 5 ] && sleep 60
           done
-          
-          # Simpan ke output
-          echo "report<<EOF" >> $GITHUB_OUTPUT
-          echo -e "$REPORT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "all_ok=$ALL_OK" >> $GITHUB_OUTPUT
-
-      - name: Send Report to Discord
-        uses: tsickert/discord-webhook@v6.0.0
-        with:
-          webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
-          embed-title: "📊 SpacePixel API Report"
-          embed-description: |
-            **Interval:** Every 5 minutes
-            **Server:** $(date -u +"%H:%M UTC")
-            
-            ${{ steps.test.outputs.report }}
-          embed-color: ${{ steps.test.outputs.all_ok == 'true' && 65280 || 16711680 }}
-          embed-footer-text: "Vercel Cron: every 1min | GH Actions: every 5min"
-
-      - name: Alert if DOWN
-        if: steps.test.outputs.all_ok != 'true'
-        uses: tsickert/discord-webhook@v6.0.0
-        with:
-          webhook-url: ${{ secrets.DISCORD_WEBHOOK_ALERT }}
-          embed-title: "🚨 CRITICAL: SpacePixel Endpoint DOWN"
-          embed-description: ${{ steps.test.outputs.report }}
-          embed-color: 16711680
