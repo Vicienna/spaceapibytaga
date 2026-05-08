@@ -204,7 +204,7 @@ app.get('/', async (req, res) => {
   const allOk = Object.values(statuses).every(s => s === 200 || s === 201);
 
   let cardsHTML = '';
-  const icons = { thrusters: '🚀', shields: '🛡️', tanks: '⛽', planets: '🌍', health: '❤️', ping: '📡' };
+  const icons = { thrusters: '🚀', shields: '🛡️', tanks: '⛽', planets: '🌍', var: '📊', health: '❤️', ping: '📡' };
 
   for (const [group, eps] of Object.entries(grouped)) {
     const icon = icons[group] || '📦';
@@ -381,6 +381,7 @@ app.get('/', async (req, res) => {
       <a href="/api/shields">🛡️ Shields</a>
       <a href="/api/tanks">⛽ Tanks</a>
       <a href="/api/planets">🌍 Planets</a>
+      <a href="/api/var">📊 Variables</a>
     </div>
     <div class="grid">${cardsHTML}</div>
     <div class="footer">
