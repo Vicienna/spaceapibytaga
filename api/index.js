@@ -8,6 +8,7 @@ const thrustersRouter = require('../routes/thrusters');
 const shieldsRouter = require('../routes/shields');
 const tanksRouter = require('../routes/tanks');
 const planetsRouter = require('../routes/planets');
+const variablesRouter = require('../routes/variables');
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use('/api/thrusters', thrustersRouter);
 app.use('/api/shields', shieldsRouter);
 app.use('/api/tanks', tanksRouter);
 app.use('/api/planets', planetsRouter);
+app.use('/api/var', variablesRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
